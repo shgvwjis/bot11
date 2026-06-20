@@ -237,6 +237,18 @@ def format_flood_time(seconds):
     else:
         return f"{seconds}秒"
 
+def escape_text(text: str) -> str:
+    """转义特殊字符，防止Markdown解析错误"""
+    # 转义 @ 符号
+    text = text.replace('@', '@')
+    # 转义下划线
+    text = text.replace('_', '\\_')
+    # 转义星号
+    text = text.replace('*', '\\*')
+    # 转义反引号
+    text = text.replace('`', '\\`')
+    return text
+
 async def get_task_management_keyboard(user_id: int, user_task_ids: List[str]) -> InlineKeyboardMarkup:
     """获取任务管理键盘 - 使用安全的回调数据"""
     keyboard = []
@@ -294,7 +306,7 @@ def format_panel_text(user_id: int) -> str:
     text = (
         "💎 欢迎使用 Telegram 账号轰炸系统(此版本为公益共享版)\n"
         "──────────────────────\n"
-        f"本版本永久承诺1分钱不收请关注创作者 https://t.me/dhs_db8\n"
+        "本版本永久承诺1分钱不收请关注创作者 https://t.me/dhs_db8\n"
         f"📟 系统状态: 在线 (v3.8 作者 @TCYP0807)\n"
         f"📊 您的任务: {active_count} / {MAX_TASKS_PER_USER}\n"
         f"📋 总任务数: {total_count} (活跃: {active_count} | 停止: {stopped_count})\n\n"
@@ -349,7 +361,8 @@ async def update_panel(user_id: int, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=user_id,
                         message_id=panel_messages[user_id],
                         text=panel_text,
-                        reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+                        reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+                        parse_mode=None  # 禁用Markdown解析
                     )
                     return
                 except Exception as e:
@@ -361,7 +374,8 @@ async def update_panel(user_id: int, context: ContextTypes.DEFAULT_TYPE):
             message = await context.bot.send_message(
                 chat_id=user_id,
                 text=panel_text,
-                reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+                reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+                parse_mode=None  # 禁用Markdown解析
             )
             panel_messages[user_id] = message.message_id
     except Exception as e:
@@ -1024,7 +1038,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_task_ids = user_tasks.get(user_id, [])
         message = await update.message.reply_text(
             panel_text,
-            reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+            reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+            parse_mode=None  # 禁用Markdown解析
         )
         async with _panel_messages_lock:
             panel_messages[user_id] = message.message_id
@@ -1043,7 +1058,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_task_ids = user_tasks.get(user_id, [])
         message = await update.message.reply_text(
             panel_text,
-            reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+            reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+            parse_mode=None  # 禁用Markdown解析
         )
         async with _panel_messages_lock:
             panel_messages[user_id] = message.message_id
@@ -1082,7 +1098,8 @@ async def verify_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_task_ids = user_tasks.get(user_id, [])
         await query.edit_message_text(
             panel_text,
-            reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+            reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+            parse_mode=None  # 禁用Markdown解析
         )
     else:
         keyboard = InlineKeyboardMarkup([
@@ -1157,7 +1174,8 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
         user_task_ids = user_tasks.get(user_id, [])
         await query.edit_message_text(
             panel_text,
-            reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+            reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+            parse_mode=None  # 禁用Markdown解析
         )
         return
     
@@ -1174,18 +1192,21 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
                 print_log(f"已发送日志文件给用户 {user_id}")
                 await query.edit_message_text(
                     "✅ 日志文件已发送！",
-                    reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, []))
+                    reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, [])),
+                    parse_mode=None  # 禁用Markdown解析
                 )
             except Exception as e:
                 print_log(f"发送日志文件失败: {e}", "ERROR")
                 await query.edit_message_text(
                     f"❌ 发送失败: {str(e)[:50]}",
-                    reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, []))
+                    reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, [])),
+                    parse_mode=None  # 禁用Markdown解析
                 )
         else:
             await query.edit_message_text(
                 "❌ 日志文件不存在",
-                reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, []))
+                reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, [])),
+                parse_mode=None  # 禁用Markdown解析
             )
         return
     
@@ -1254,7 +1275,8 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             stats_text,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 返回主菜单", callback_data=f"rf_{token}")]
-            ])
+            ]),
+            parse_mode=None  # 禁用Markdown解析
         )
         return
     
@@ -1271,7 +1293,8 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
                 f"❌ 您的配额已满！\n当前活跃任务: {active_count}/{MAX_TASKS_PER_USER}\n请停止或删除任务后再添加",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔙 返回主菜单", callback_data=f"rf_{token}")]
-                ])
+                ]),
+                parse_mode=None  # 禁用Markdown解析
             )
             return
         
@@ -1282,7 +1305,8 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             "➕ 增加配额\n\n"
             "请输入目标手机号（格式：+8613800138000）:\n\n"
             "📝 示例：+861234567890\n"
-            "输入 /cancel 取消操作"
+            "输入 /cancel 取消操作",
+            parse_mode=None  # 禁用Markdown解析
         )
         return PHONE_NUMBER
     
@@ -1308,7 +1332,8 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             user_task_ids = user_tasks.get(user_id, [])
             await query.edit_message_text(
                 panel_text,
-                reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+                reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+                parse_mode=None  # 禁用Markdown解析
             )
             await context.bot.send_message(
                 chat_id=user_id,
@@ -1349,7 +1374,8 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             user_task_ids = user_tasks.get(user_id, [])
             await query.edit_message_text(
                 panel_text,
-                reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+                reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+                parse_mode=None  # 禁用Markdown解析
             )
             await context.bot.send_message(
                 chat_id=user_id,
@@ -1393,7 +1419,8 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             user_task_ids = user_tasks.get(user_id, [])
             await query.edit_message_text(
                 panel_text,
-                reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+                reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+                parse_mode=None  # 禁用Markdown解析
             )
             await context.bot.send_message(
                 chat_id=user_id,
@@ -1522,7 +1549,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     token = await generate_session_token(user_id)
     message = await update.message.reply_text(
         panel_text,
-        reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
+        reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
+        parse_mode=None  # 禁用Markdown解析
     )
     async with _panel_messages_lock:
         panel_messages[user_id] = message.message_id
