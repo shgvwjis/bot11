@@ -295,7 +295,7 @@ def format_panel_text(user_id: int) -> str:
         "💎 欢迎使用 Telegram 账号轰炸系统(此版本为公益共享版)\n"
         "──────────────────────\n"
         f"本版本永久承诺1分钱不收请关注创作者 https://t.me/dhs_db8\n"
-        f"📟 系统状态: 在线 (v3.8 作者 @APl520)\n"
+        f"📟 系统状态: 在线 (v3.8 作者 @TCYP0807)\n"
         f"📊 您的任务: {active_count} / {MAX_TASKS_PER_USER}\n"
         f"📋 总任务数: {total_count} (活跃: {active_count} | 停止: {stopped_count})\n\n"
     )
