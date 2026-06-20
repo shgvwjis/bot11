@@ -16,21 +16,13 @@ import hashlib
 import secrets
 import base64
 
-# ==================== Railway 环境配置 ====================
-# 获取 Railway 提供的持久化存储路径
-RAILWAY_VOLUME = os.environ.get('RAILWAY_VOLUME_MOUNT_PATH', '/app/data')
-DATA_DIR = Path(RAILWAY_VOLUME)
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-# 日志目录
-LOG_DIR = DATA_DIR / 'logs'
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
 # ==================== 控制台输出重定向到文件 ====================
 class TeeLogger:
     def __init__(self, filename):
         self.terminal = sys.stdout
-        self.log_file = open(filename, 'a', encoding='utf-8')
+        log_dir = Path("/storage/emulated/0/TelegramBomb")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        self.log_file = open(log_dir / filename, 'a', encoding='utf-8')
         
     def write(self, message):
         self.terminal.write(message)
@@ -44,7 +36,9 @@ class TeeLogger:
 class TeeErrorLogger:
     def __init__(self, filename):
         self.terminal = sys.stderr
-        self.log_file = open(filename, 'a', encoding='utf-8')
+        log_dir = Path("/storage/emulated/0/TelegramBomb")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        self.log_file = open(log_dir / filename, 'a', encoding='utf-8')
         
     def write(self, message):
         self.terminal.write(message)
@@ -56,16 +50,15 @@ class TeeErrorLogger:
         self.log_file.flush()
 
 start_time_log = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = LOG_DIR / f"bomb_console_{start_time_log}.txt"
-error_log_filename = LOG_DIR / f"bomb_error_{start_time_log}.txt"
+log_filename = f"bomb_console_{start_time_log}.txt"
+error_log_filename = f"bomb_error_{start_time_log}.txt"
 
 sys.stdout = TeeLogger(log_filename)
 sys.stderr = TeeErrorLogger(error_log_filename)
 
 print("=" * 70)
 print(f"轰炸机器人启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-print(f"数据目录: {DATA_DIR}")
-print(f"日志目录: {LOG_DIR}")
+print(f"控制台日志文件: /storage/emulated/0/TelegramBomb/{log_filename}")
 print("=" * 70)
 print()
 
@@ -90,7 +83,7 @@ PHONE_NUMBER = 1
 
 # 存储被禁用的用户
 banned_users: Set[int] = set()
-BANNED_USERS_FILE = DATA_DIR / "banned_users.json"
+BANNED_USERS_FILE = "/storage/emulated/0/TelegramBomb/banned_users.json"
 
 # 任务存储结构: task_id -> TaskData
 class TaskData:
@@ -200,7 +193,7 @@ _panel_messages_lock = asyncio.Lock()
 
 # 用户使用记录
 user_usage: Dict[int, Dict] = {}
-USER_USAGE_FILE = DATA_DIR / "user_usage.json"
+USER_USAGE_FILE = "/storage/emulated/0/TelegramBomb/user_usage.json"
 
 # 全局应用实例
 application = None
@@ -236,18 +229,6 @@ def format_flood_time(seconds):
         return f"{seconds//60}分钟"
     else:
         return f"{seconds}秒"
-
-def escape_text(text: str) -> str:
-    """转义特殊字符，防止Markdown解析错误"""
-    # 转义 @ 符号
-    text = text.replace('@', '@')
-    # 转义下划线
-    text = text.replace('_', '\\_')
-    # 转义星号
-    text = text.replace('*', '\\*')
-    # 转义反引号
-    text = text.replace('`', '\\`')
-    return text
 
 async def get_task_management_keyboard(user_id: int, user_task_ids: List[str]) -> InlineKeyboardMarkup:
     """获取任务管理键盘 - 使用安全的回调数据"""
@@ -306,8 +287,8 @@ def format_panel_text(user_id: int) -> str:
     text = (
         "💎 欢迎使用 Telegram 账号轰炸系统(此版本为公益共享版)\n"
         "──────────────────────\n"
-        "本版本永久承诺1分钱不收请关注创作者 https://t.me/dhs_db8\n"
-        f"📟 系统状态: 在线 (v3.8 作者 @TCYP0807)\n"
+        f"本版本永久承诺1分钱不收请关注创作者 https://t.me/APl57\n"
+        f"📟 系统状态: 在线 (v3.8 作者 @APl520)\n"
         f"📊 您的任务: {active_count} / {MAX_TASKS_PER_USER}\n"
         f"📋 总任务数: {total_count} (活跃: {active_count} | 停止: {stopped_count})\n\n"
     )
@@ -361,8 +342,7 @@ async def update_panel(user_id: int, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=user_id,
                         message_id=panel_messages[user_id],
                         text=panel_text,
-                        reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-                        parse_mode=None  # 禁用Markdown解析
+                        reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
                     )
                     return
                 except Exception as e:
@@ -374,8 +354,7 @@ async def update_panel(user_id: int, context: ContextTypes.DEFAULT_TYPE):
             message = await context.bot.send_message(
                 chat_id=user_id,
                 text=panel_text,
-                reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-                parse_mode=None  # 禁用Markdown解析
+                reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
             )
             panel_messages[user_id] = message.message_id
     except Exception as e:
@@ -385,7 +364,7 @@ async def update_panel(user_id: int, context: ContextTypes.DEFAULT_TYPE):
 def load_banned_users():
     global banned_users
     try:
-        if BANNED_USERS_FILE.exists():
+        if os.path.exists(BANNED_USERS_FILE):
             with open(BANNED_USERS_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 banned_users = set(data.get("banned_users", []))
@@ -404,7 +383,7 @@ def save_banned_users():
 def load_user_usage():
     global user_usage
     try:
-        if USER_USAGE_FILE.exists():
+        if os.path.exists(USER_USAGE_FILE):
             with open(USER_USAGE_FILE, 'r', encoding='utf-8') as f:
                 user_usage = json.load(f)
                 user_usage = {int(k): v for k, v in user_usage.items()}
@@ -422,7 +401,7 @@ def save_user_usage():
 async def save_user_tasks():
     """保存用户任务列表"""
     try:
-        tasks_file = DATA_DIR / "user_tasks.json"
+        tasks_file = "/storage/emulated/0/TelegramBomb/user_tasks.json"
         async with _user_tasks_lock:
             data = {str(k): v for k, v in user_tasks.items()}
         with open(tasks_file, 'w', encoding='utf-8') as f:
@@ -435,8 +414,8 @@ def load_user_tasks():
     """加载用户任务列表"""
     global user_tasks
     try:
-        tasks_file = DATA_DIR / "user_tasks.json"
-        if tasks_file.exists():
+        tasks_file = "/storage/emulated/0/TelegramBomb/user_tasks.json"
+        if os.path.exists(tasks_file):
             with open(tasks_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 user_tasks = {int(k): v for k, v in data.items()}
@@ -447,7 +426,7 @@ def load_user_tasks():
 async def save_active_tasks():
     """保存活跃任务信息（用于恢复）"""
     try:
-        tasks_data_file = DATA_DIR / "active_tasks.json"
+        tasks_data_file = "/storage/emulated/0/TelegramBomb/active_tasks.json"
         data = {}
         async with _tasks_lock:
             for task_id, task_data in active_tasks.items():
@@ -1038,8 +1017,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_task_ids = user_tasks.get(user_id, [])
         message = await update.message.reply_text(
             panel_text,
-            reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-            parse_mode=None  # 禁用Markdown解析
+            reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
         )
         async with _panel_messages_lock:
             panel_messages[user_id] = message.message_id
@@ -1058,8 +1036,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_task_ids = user_tasks.get(user_id, [])
         message = await update.message.reply_text(
             panel_text,
-            reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-            parse_mode=None  # 禁用Markdown解析
+            reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
         )
         async with _panel_messages_lock:
             panel_messages[user_id] = message.message_id
@@ -1098,8 +1075,7 @@ async def verify_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_task_ids = user_tasks.get(user_id, [])
         await query.edit_message_text(
             panel_text,
-            reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-            parse_mode=None  # 禁用Markdown解析
+            reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
         )
     else:
         keyboard = InlineKeyboardMarkup([
@@ -1174,15 +1150,15 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
         user_task_ids = user_tasks.get(user_id, [])
         await query.edit_message_text(
             panel_text,
-            reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-            parse_mode=None  # 禁用Markdown解析
+            reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
         )
         return
     
     elif action_code == "vl":
-        if log_filename.exists():
+        log_path = Path(f"/storage/emulated/0/TelegramBomb/{log_filename}")
+        if log_path.exists():
             try:
-                with open(log_filename, 'rb') as f:
+                with open(log_path, 'rb') as f:
                     await context.bot.send_document(
                         chat_id=user_id,
                         document=f,
@@ -1192,21 +1168,18 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
                 print_log(f"已发送日志文件给用户 {user_id}")
                 await query.edit_message_text(
                     "✅ 日志文件已发送！",
-                    reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, [])),
-                    parse_mode=None  # 禁用Markdown解析
+                    reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, []))
                 )
             except Exception as e:
                 print_log(f"发送日志文件失败: {e}", "ERROR")
                 await query.edit_message_text(
                     f"❌ 发送失败: {str(e)[:50]}",
-                    reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, [])),
-                    parse_mode=None  # 禁用Markdown解析
+                    reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, []))
                 )
         else:
             await query.edit_message_text(
                 "❌ 日志文件不存在",
-                reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, [])),
-                parse_mode=None  # 禁用Markdown解析
+                reply_markup=await get_task_management_keyboard(user_id, user_tasks.get(user_id, []))
             )
         return
     
@@ -1262,8 +1235,8 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             f"• 总请求: {stats['total_requests']}\n"
             f"• 成功: {stats['total_success']} | 失败: {stats['total_fails']}\n"
             f"⏰ 运行时间: {(datetime.now() - stats['start_time']).total_seconds()/3600:.1f} 小时\n\n"
-            f"📁 数据目录: {DATA_DIR}\n"
-            f"📄 当前日志: {log_filename.name}"
+            f"📁 日志目录: /storage/emulated/0/TelegramBomb/\n"
+            f"📄 当前日志: {log_filename}"
         )
         
         stats_text += task_details
@@ -1275,8 +1248,7 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             stats_text,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔙 返回主菜单", callback_data=f"rf_{token}")]
-            ]),
-            parse_mode=None  # 禁用Markdown解析
+            ])
         )
         return
     
@@ -1293,8 +1265,7 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
                 f"❌ 您的配额已满！\n当前活跃任务: {active_count}/{MAX_TASKS_PER_USER}\n请停止或删除任务后再添加",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔙 返回主菜单", callback_data=f"rf_{token}")]
-                ]),
-                parse_mode=None  # 禁用Markdown解析
+                ])
             )
             return
         
@@ -1305,8 +1276,7 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             "➕ 增加配额\n\n"
             "请输入目标手机号（格式：+8613800138000）:\n\n"
             "📝 示例：+861234567890\n"
-            "输入 /cancel 取消操作",
-            parse_mode=None  # 禁用Markdown解析
+            "输入 /cancel 取消操作"
         )
         return PHONE_NUMBER
     
@@ -1332,8 +1302,7 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             user_task_ids = user_tasks.get(user_id, [])
             await query.edit_message_text(
                 panel_text,
-                reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-                parse_mode=None  # 禁用Markdown解析
+                reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
             )
             await context.bot.send_message(
                 chat_id=user_id,
@@ -1374,8 +1343,7 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             user_task_ids = user_tasks.get(user_id, [])
             await query.edit_message_text(
                 panel_text,
-                reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-                parse_mode=None  # 禁用Markdown解析
+                reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
             )
             await context.bot.send_message(
                 chat_id=user_id,
@@ -1419,8 +1387,7 @@ async def handle_secure_callback(update: Update, context: ContextTypes.DEFAULT_T
             user_task_ids = user_tasks.get(user_id, [])
             await query.edit_message_text(
                 panel_text,
-                reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-                parse_mode=None  # 禁用Markdown解析
+                reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
             )
             await context.bot.send_message(
                 chat_id=user_id,
@@ -1549,8 +1516,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     token = await generate_session_token(user_id)
     message = await update.message.reply_text(
         panel_text,
-        reply_markup=await get_task_management_keyboard(user_id, user_task_ids),
-        parse_mode=None  # 禁用Markdown解析
+        reply_markup=await get_task_management_keyboard(user_id, user_task_ids)
     )
     async with _panel_messages_lock:
         panel_messages[user_id] = message.message_id
@@ -1595,9 +1561,9 @@ def main():
     global application
     
     print_log("=" * 70)
-    print_log("💣 Telegram 验证码轰炸机启动 - Railway 部署版 v3.0")
-    print_log(f"📁 数据目录: {DATA_DIR}")
-    print_log(f"📁 日志目录: {LOG_DIR}")
+    print_log("💣 Telegram 验证码轰炸机启动 - 多用户隔离版 v2.1")
+    print_log(f"📁 日志路径: /storage/emulated/0/TelegramBomb/")
+    print_log(f"📄 日志文件: {log_filename}")
     print_log(f"⚡ 用户最大并发: {MAX_TASKS_PER_USER}")
     print_log(f"⚡ 系统最大并发: {MAX_CONCURRENT_TASKS}")
     print_log(f"🔒 必需频道: {REQUIRED_CHANNEL}")
@@ -1630,8 +1596,8 @@ def main():
         application.add_handler(CommandHandler("unfd", unfd_command))
         application.add_handler(CommandHandler("gfhl", gfhl_command))
         application.add_handler(CommandHandler("stats_all", stats_all_command))
-        application.add_handler(CommandHandler("dz", dz_command))
-        application.add_handler(CommandHandler("tz", tz_command))
+        application.add_handler(CommandHandler("dz", dz_command))  # 新增
+        application.add_handler(CommandHandler("tz", tz_command))  # 新增
         
         # 添加任务会话处理器
         application.add_handler(create_add_task_conversation())
